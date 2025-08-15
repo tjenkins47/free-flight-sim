@@ -30,31 +30,4 @@ html, body { margin:0; height:100%; overflow:hidden; background: radial-gradient
 }
 /* Hide controls on desktop by default */
 .tc { display: none; }
-/* Touch controls: phones/tablets only */
-@media (hover: none) and (pointer: coarse) {
-  .tc {
-    position: fixed; right: 10px; bottom: 10px;
-    display: grid; gap: 8px;
-    background: rgba(10,16,30,0.45);
-    padding: 10px; border-radius: 14px;
-    backdrop-filter: blur(4px);
-    z-index: 10;
-  }
-  .tc .row { display: flex; gap: 8px; justify-content: center; }
-  .tc .row.small { gap: 6px; }
-  .tc .btn {
-    min-width: 80px; min-height: 54px;
-    font: 600 14px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    color: #cfe8ff; background: rgba(30,50,80,0.7);
-    border: 1px solid rgba(140,180,220,0.35);
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.35) inset, 0 1px 4px rgba(0,0,0,0.2);
-    touch-action: none;
-  }
-  .tc .btn:active { transform: scale(0.98); }
-  .tc .btn.wide { min-width: 168px; }
-}
-/* Hidden on desktop by default */
-.tc { display: none; }
-
 
