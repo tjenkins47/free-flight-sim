@@ -33,47 +33,41 @@ window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.inn
 let last=performance.now();function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;physics(dt);animateOcean(now*.06);renderer.render(scene,camera);updateHUD();requestAnimationFrame(tick);}tick(last);
 
 
-// ===== Mobile & Pause Integration =====
+/* ===== Mobile controls + Pause integration ===== */
 (function(){
-  // Debounced pause toggle that updates HUD badge and touch button label
-  let lastToggle = 0;
   function setPaused(p){
     window.__paused = !!p;
     const pEl = document.getElementById('paused');
-    if (pEl) pEl.style.display = window.__paused ? 'inline-block' : 'none';
+    if (pEl) pEl.style.display = window.__paused ? 'block' : 'none';
     const tcPause = document.getElementById('tc-pause');
     if (tcPause) tcPause.textContent = window.__paused ? 'Resume' : 'Pause';
+    try { window.paused = window.__paused; } catch(e){}
+    try { window.isPaused = window.__paused; } catch(e){}
   }
   function togglePause(){
     const now = performance.now();
-    if (now - lastToggle < 160) return; // debounce
-    lastToggle = now;
+    if (!togglePause._t) togglePause._t = 0;
+    if (now - togglePause._t < 160) return;
+    togglePause._t = now;
     setPaused(!window.__paused);
   }
 
-  // Replace existing keydown pause handler to call togglePause()
-  // We'll attach an additional handler (the existing one is harmless, but this ensures correct behavior).
-  window.addEventListener('keydown', (e) => {
-    if (e.code === 'Numpad3') {
-      e.preventDefault();
-      togglePause();
-    }
+  // Ensure Numpad3 toggles pause reliably
+  window.addEventListener('keydown', (e)=>{
+    if (e.code === 'Numpad3') { e.preventDefault(); togglePause(); }
   }, {passive:false});
 
-  // Touch controls setup
+  // Touch controls
   const tc = document.getElementById('touchControls');
   if (tc) {
-    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     if (isTouch) {
       tc.style.display = 'block';
       tc.setAttribute('aria-hidden','false');
     }
+    // Use the existing Set 'keys' from your script
+    const keysDown = (typeof keys !== 'undefined' && keys instanceof Set) ? keys : new Set();
 
-    const keysDown = (typeof keys !== 'undefined' && keys instanceof Set)
-      ? keys
-      : (function(){ const s=new Set(); return s; })();
-
-    // press-and-hold mapping for buttons with data-code
     tc.querySelectorAll('.btn[data-code]').forEach(btn => {
       const code = btn.getAttribute('data-code');
       const start = (ev)=>{ ev.preventDefault(); keysDown.add(code); };
@@ -87,7 +81,6 @@ let last=performance.now();function tick(now){const dt=Math.min(.05,(now-last)/1
       btn.addEventListener('mouseleave', end);
     });
 
-    // Pause/Reset tap buttons
     const pauseBtn = document.getElementById('tc-pause');
     const resetBtn = document.getElementById('tc-reset');
     if (pauseBtn) {
@@ -98,16 +91,90 @@ let last=performance.now();function tick(now){const dt=Math.min(.05,(now-last)/1
     if (resetBtn) {
       const onTap = (ev)=>{
         ev.preventDefault();
-        // Simulate pressing NumpadDecimal or directly call your reset routine if exposed
-        // We'll add/remove a marker to trigger the reset branch in your physics loop
-        keysDown.add('NumpadDecimal');
-        setTimeout(()=>keysDown.delete('NumpadDecimal'), 50);
+        // simulate NumpadDecimal keypress to use your reset branch
+        const down = new KeyboardEvent('keydown', {code:'NumpadDecimal'});
+        const up   = new KeyboardEvent('keyup',   {code:'NumpadDecimal'});
+        window.dispatchEvent(down); window.dispatchEvent(up);
       };
       resetBtn.addEventListener('click', onTap);
       resetBtn.addEventListener('touchend', onTap, {passive:false});
     }
   }
 
-  // Initialize badge state on load
+  // Strong pause shim for time-freeze
+  if (THREE && THREE.Clock && !THREE.Clock.__patched_for_pause__) {
+    const _getDelta = THREE.Clock.prototype.getDelta;
+    THREE.Clock.prototype.getDelta = function(){
+      const d = _getDelta.call(this);
+      return window.__paused ? 0 : d;
+    };
+    THREE.Clock.__patched_for_pause__ = true;
+  }
+  if (typeof renderer !== 'undefined' && !renderer.__render_patched_for_pause__) {
+    const _render = renderer.render.bind(renderer);
+    renderer.render = function(scene, camera){
+      if (window.__paused) return;
+      return _render(scene, camera);
+    };
+    renderer.__render_patched_for_pause__ = true;
+  }
+
+  // Initialize HUD badge state
   setPaused(!!window.__paused);
+})();
+
+/* ===== City lights brightness & color pop (NW cluster) ===== */
+(function enhanceCity(){
+  // Boost emissive on building window panels created in createCityNW()
+  (scene || {}).traverse && scene.traverse(obj => {
+    if (obj.isMesh && obj.material && obj.material.isMeshBasicMaterial) {
+      // window panels: pop brightness
+      if ('color' in obj.material) {
+        // Randomize warm/cool tint per panel
+        const r = Math.random();
+        if (r < 0.33) obj.material.color.set(0xfff1b3);   // warm
+        else if (r < 0.66) obj.material.color.set(0xffe9cf); // soft white
+        else obj.material.color.set(0xaed4ff);            // cool
+      }
+    }
+  });
+
+  // Add dense point cluster hovering above NW city for bright multicolor lights
+  try {
+    const count = 2500;
+    const g = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+
+    // approximate area around baseX/baseZ from user's city: (-1200, -1200)
+    for (let i=0;i<count;i++){
+      const x = -1200 - Math.random()*900;     // more to the NW (negative X)
+      const z = -1200 - Math.random()*900;     // more to the NW (negative Z)
+      const y = 40 + Math.random()*260;        // hover above buildings
+      positions[i*3+0] = x + (Math.random()*40-20);
+      positions[i*3+1] = y;
+      positions[i*3+2] = z + (Math.random()*40-20);
+
+      // color palette: amber, soft white, cool blue, occasional red/green
+      const r = Math.random();
+      let col = new THREE.Color(0xffd27a);
+      if (r < 0.25) col.set(0xfff6e5);
+      else if (r < 0.5) col.set(0xaed4ff);
+      else if (r < 0.65) col.set(0xff7a7a);
+      else if (r < 0.8) col.set(0x9bff9b);
+      colors[i*3+0] = col.r; colors[i*3+1] = col.g; colors[i*3+2] = col.b;
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const m = new THREE.PointsMaterial({
+      size: 4.0,
+      sizeAttenuation: true,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.95
+    });
+    const pts = new THREE.Points(g, m);
+    scene.add(pts);
+  } catch(e){ /* no-op */ }
 })();

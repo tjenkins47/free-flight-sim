@@ -4,49 +4,43 @@ html, body { margin:0; height:100%; overflow:hidden; background: radial-gradient
 #hud .help{margin-top:6px;font-size:12px;opacity:.85;}
 
 
-/* Small red 'Paused' badge inside HUD */
-#paused {
-  display: none;
-  color: #ff4d4f;
-  font-weight: 700;
-  font-size: 12px;
-  margin-top: 4px;
-}
+/* Remove any borders/outline that could cause white rectangle lines */
+html, body, #scene, #hud, #touchControls { border: none !important; outline: none !important; }
+*:focus { outline: none !important; }
 
-/* Touch controls pinned to bottom */
+/* Touch controls pinned to bottom, safe-area aware, smaller footprint */
 .tc {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 16px;
-  display: none; /* JS will enable on touch devices; also via media query */
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 64px);
+  display: none; /* enabled on touch devices & via media query */
   user-select: none;
-  z-index: 12;
+  z-index: 20;
 }
-
+@supports not (bottom: env(safe-area-inset-bottom)) {
+  .tc { bottom: 80px; }
+}
 .tc .row {
   display: grid;
-  grid-template-columns: repeat(3, 64px);
-  gap: 8px;
+  grid-template-columns: repeat(3, 56px);
+  gap: 6px;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
-
-.tc .row.small { grid-template-columns: repeat(2, 204px); }
-
+.tc .row.small { grid-template-columns: repeat(2, 176px); }
 .tc .btn {
-  height: 44px;
+  height: 40px;
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.35);
   background: rgba(255,255,255,0.12);
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
 }
-
 .tc .btn:active { background: rgba(255,255,255,0.28); }
 .tc .btn.wide { width: 100%; }
 
-/* Show touch controls on small screens, too */
+/* Show touch controls on small screens as well */
 @media (max-width: 820px) {
   .tc { display: block; }
 }
