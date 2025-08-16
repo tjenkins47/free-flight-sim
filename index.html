@@ -16,31 +16,35 @@
         NumPad — 8/2 Throttle ▲/▼ • 5/0 Pitch ▲/▼ • 4/6 Roll ◄/► • 7/9 Yaw ◄/► • 1 Brake • <b>3 Pause</b> • <b>. Reset</b>
     </div>
 
-<!-- Touch controls (shown only on touch devices) -->
-<div id="touchControls" class="tc" aria-hidden="true">
-  <div class="row">
-    <button class="btn" data-code="Numpad7">Yaw ◄</button>
-    <button class="btn" data-code="Numpad5">Pitch ▲</button>
-    <button class="btn" data-code="Numpad9">Yaw ►</button>
+    <!-- Touch controls (shown only on touch devices) -->
+    <div id="touchControls" class="tc" aria-hidden="true">
+      <div class="row">
+        <button class="btn" data-code="Numpad7">Yaw ◄</button>
+        <button class="btn" data-code="Numpad5">Pitch ▲</button>
+        <button class="btn" data-code="Numpad9">Yaw ►</button>
+      </div>
+      <div class="row">
+        <button class="btn" data-code="Numpad4">Roll ◄</button>
+        <button class="btn" data-code="Numpad0">Pitch ▼</button>
+        <button class="btn" data-code="Numpad6">Roll ►</button>
+      </div>
+      <div class="row">
+        <button class="btn" data-code="Numpad2">Throttle ▼</button>
+        <button class="btn" data-code="Numpad8">Throttle ▲</button>
+        <button class="btn" data-code="Numpad1">Brake</button>
+      </div>
+      <div class="row small">
+        <button class="btn wide" id="tc-pause" data-tap="pause">Pause</button>
+        <button class="btn wide" id="tc-reset" data-tap="reset">Reset</button>
+      </div>
+    </div>
   </div>
-  <div class="row">
-    <button class="btn" data-code="Numpad4">Roll ◄</button>
-    <button class="btn" data-code="Numpad0">Pitch ▼</button>
-    <button class="btn" data-code="Numpad6">Roll ►</button>
-  </div>
-  <div class="row">
-    <button class="btn" data-code="Numpad2">Throttle ▼</button>
-    <button class="btn" data-code="Numpad8">Throttle ▲</button>
-    <button class="btn" data-code="Numpad1">Brake</button>
-  </div>
-  <div class="row small">
-    <button class="btn wide" id="tc-pause" data-tap="pause">Pause</button>
-    <button class="btn wide" id="tc-reset" data-tap="reset">Reset</button>
-  </div>
-</div>
-  </div>
+
   <canvas id="scene" tabindex="0"></canvas>
+
+  <div id="pausedOverlay" aria-hidden="true">PAUSED</div>
+
   <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
- <script src="script.js?v=7"></script>
+  <script src="script.js?v=8"></script>
 </body>
 </html>
