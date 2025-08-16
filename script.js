@@ -123,58 +123,47 @@ let last=performance.now();function tick(now){const dt=Math.min(.05,(now-last)/1
   setPaused(!!window.__paused);
 })();
 
-/* ===== City lights brightness & color pop (NW cluster) ===== */
-(function enhanceCity(){
-  // Boost emissive on building window panels created in createCityNW()
-  (scene || {}).traverse && scene.traverse(obj => {
-    if (obj.isMesh && obj.material && obj.material.isMeshBasicMaterial) {
-      // window panels: pop brightness
-      if ('color' in obj.material) {
-        // Randomize warm/cool tint per panel
-        const r = Math.random();
-        if (r < 0.33) obj.material.color.set(0xfff1b3);   // warm
-        else if (r < 0.66) obj.material.color.set(0xffe9cf); // soft white
-        else obj.material.color.set(0xaed4ff);            // cool
+
+
+
+/* ===== Global City Lights Enhancement (v6) ===== */
+(function enhanceAllCityLights(){
+  if (!scene) return;
+  scene.traverse(obj => {
+    if (obj.isPoints && obj.material && obj.material.isPointsMaterial) {
+      if ('size' in obj.material) {
+        obj.material.size = (obj.material.size||2.5) * (2.5 + Math.random()*0.5);
+      }
+      obj.material.sizeAttenuation = true;
+      obj.material.transparent = true;
+      obj.material.opacity = 0.95;
+      obj.material.vertexColors = true;
+      obj.material.toneMapped = false;
+      obj.material.needsUpdate = true;
+      const g = obj.geometry;
+      if (g && g.getAttribute('position') && !g.getAttribute('color')) {
+        const count = g.getAttribute('position').count;
+        const colors = new Float32Array(count*3);
+        for (let i=0;i<count;i++){
+          let col = new THREE.Color();
+          const r = Math.random();
+          if (r<0.25) col.set(0xfff1b3);
+          else if (r<0.5) col.set(0xffe9cf);
+          else if (r<0.7) col.set(0xaed4ff);
+          else if (r<0.85) col.set(0xff7a7a);
+          else col.set(0x9bff9b);
+          colors[i*3+0]=col.r;colors[i*3+1]=col.g;colors[i*3+2]=col.b;
+        }
+        g.setAttribute('color', new THREE.BufferAttribute(colors,3));
       }
     }
-  });
-
-  // Add dense point cluster hovering above NW city for bright multicolor lights
-  try {
-    const count = 2500;
-    const g = new THREE.BufferGeometry();
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-
-    // approximate area around baseX/baseZ from user's city: (-1200, -1200)
-    for (let i=0;i<count;i++){
-      const x = -1200 - Math.random()*900;     // more to the NW (negative X)
-      const z = -1200 - Math.random()*900;     // more to the NW (negative Z)
-      const y = 40 + Math.random()*260;        // hover above buildings
-      positions[i*3+0] = x + (Math.random()*40-20);
-      positions[i*3+1] = y;
-      positions[i*3+2] = z + (Math.random()*40-20);
-
-      // color palette: amber, soft white, cool blue, occasional red/green
+    if (obj.isMesh && obj.material && obj.material.isMeshBasicMaterial) {
       const r = Math.random();
-      let col = new THREE.Color(0xffd27a);
-      if (r < 0.25) col.set(0xfff6e5);
-      else if (r < 0.5) col.set(0xaed4ff);
-      else if (r < 0.65) col.set(0xff7a7a);
-      else if (r < 0.8) col.set(0x9bff9b);
-      colors[i*3+0] = col.r; colors[i*3+1] = col.g; colors[i*3+2] = col.b;
+      if (r<0.25) obj.material.color.set(0xfff1b3);
+      else if (r<0.5) obj.material.color.set(0xffe9cf);
+      else if (r<0.7) obj.material.color.set(0xaed4ff);
+      else if (r<0.85) obj.material.color.set(0xff7a7a);
+      else obj.material.color.set(0x9bff9b);
     }
-    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const m = new THREE.PointsMaterial({
-      size: 4.0,
-      sizeAttenuation: true,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.95
-    });
-    const pts = new THREE.Points(g, m);
-    scene.add(pts);
-  } catch(e){ /* no-op */ }
+  });
 })();
