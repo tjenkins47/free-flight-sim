@@ -7,6 +7,29 @@ const camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight
 const ambient=new THREE.AmbientLight(0x6b86c2,.55);scene.add(ambient);
 const moon=new THREE.DirectionalLight(0xaaccff,.7);moon.position.set(-1500,2500,-1800);moon.castShadow=true;scene.add(moon);
 
+// Make a soft circular sprite texture for round points
+function makeCircleSprite(size=64){
+  const cnv = document.createElement('canvas');
+  cnv.width = cnv.height = size;
+  const ctx = cnv.getContext('2d');
+  const r = size/2;
+  const g = ctx.createRadialGradient(r,r,0, r,r,r);
+  g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(0.7,'rgba(255,255,255,0.9)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(r,r,r,0,Math.PI*2);
+  ctx.fill();
+  const tex = new THREE.CanvasTexture(cnv);
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  return tex;
+}
+const suburbSprite = makeCircleSprite(64);
+
+
 function addStars(){
   const g = new THREE.BufferGeometry();
   const n = 5000;
@@ -22,16 +45,17 @@ function addStars(){
   }
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
-  const m = new THREE.PointsMaterial({
-    size: 8 * dpr,           // bigger, bolder stars; try 7–10*dpr
-    sizeAttenuation: false,  // pixel-sized so they pop on phones
-    color: 0x9fcfff,
-    transparent: true,
-    opacity: 1.0,
-    depthWrite: false,
-    toneMapped: false,
-    blending: THREE.AdditiveBlending
-  });
+    const m = new THREE.PointsMaterial({
+      size: 4,                  // a touch bigger than 3
+      sizeAttenuation: true,    // perspective scaling like your classic version
+      color: 0xbfdfff,          // slightly brighter tint
+      transparent: true,
+      opacity: 1.0,             // brighter
+      depthWrite: false,
+      toneMapped: false,
+      blending: THREE.AdditiveBlending  // subtle extra sparkle; remove if too bright
+    });
+
   const stars = new THREE.Points(g,m);
   stars.name = 'stars';
   scene.add(stars);
@@ -120,15 +144,19 @@ function createSuburbLights({
 
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
   const m = new THREE.PointsMaterial({
-    size: sizePX * dpr,
-    sizeAttenuation: false, // pixel size so they stay bold on phones
-    vertexColors: true,
-    transparent: true,
-    opacity: 1.0,
-    depthWrite: false,
-    toneMapped: false,
-    blending: THREE.AdditiveBlending
-  });
+      size: sizePX * dpr,
+      sizeAttenuation: false,      // pixel-sized: great on phones
+      map: suburbSprite,           // << round sprite
+      alphaTest: 0.5,              // cut out square corners
+      vertexColors: true,
+      color: 0xffffff,             // multiply by vertex colors
+      transparent: true,
+      opacity: 1.0,
+      depthWrite: false,
+      toneMapped: false,
+      blending: THREE.AdditiveBlending
+    });
+
 
   const pts = new THREE.Points(g, m);
   pts.name = 'suburbLights';
@@ -161,24 +189,26 @@ function createCityNW(){
 }
 createCityNW();
 
-// near-shore ribbon (≈30% prior density, bolder size)
+// near-shore ribbon (HALF density)
 createSuburbLights({
   coastX: 0,
   length: 24000,
   depth: 2200,
-  density: 0.000036,   // was 0.00012
+  density: 0.000018,   // was 0.000036
   sizePX: 10,
   paletteBias: 0.72
 });
-// inland ribbon (≈30% prior density)
+
+// inland ribbon (HALF density)
 createSuburbLights({
   coastX: 0,
   length: 24000,
   depth: 5200,
-  density: 0.000015,   // was 0.00005
+  density: 0.0000075,  // was 0.000015
   sizePX: 9,
   paletteBias: 0.65
 });
+
 
 const state={throttle:.6,speed:90,pos:new THREE.Vector3(900,380,900),pitch:0,yaw:THREE.MathUtils.degToRad(-135),roll:0};
 camera.position.copy(state.pos);camera.rotation.order='ZYX';
