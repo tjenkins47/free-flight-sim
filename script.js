@@ -46,18 +46,16 @@ function addStars(){
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
     const isPhone = /Mobi|Android/i.test(navigator.userAgent);
-
     const m = new THREE.PointsMaterial({
-      size: isPhone ? 6 : 4,            // bump up star size on phone
-      sizeAttenuation: true,
-      color: 0xd5ecff,                  // brighter tint
+      size: isPhone ? 9 : 4.5,        // ~2× phone size (was 4)
+      sizeAttenuation: true,         // keep the classic look
+      color: 0xdef3ff,               // brighter tint than 0x9fcfff
       transparent: true,
-      opacity: isPhone ? 1.0 : 0.95,    // stronger presence on phone
+      opacity: isPhone ? 1.0 : 0.95, // ~2× brightness feel on phone
       depthWrite: false,
       toneMapped: false,
       blending: THREE.AdditiveBlending
     });
-
   const stars = new THREE.Points(g,m);
   stars.name = 'stars';
   scene.add(stars);
@@ -212,16 +210,26 @@ createSuburbLights({
 });
 
 
-const state={throttle:.6,speed:51.5,pos:new THREE.Vector3(900,380,900),pitch:0,yaw:THREE.MathUtils.degToRad(-135),roll:0};
+const state = {
+  throttle: 0.15,   // was .6  ← balance around 100 kt at start
+  speed: 51.5,      // 100 kt in m/s
+  pos: new THREE.Vector3(900,380,900),
+  pitch: 0,
+  yaw: THREE.MathUtils.degToRad(-135),
+  roll: 0
+};
+
 camera.position.copy(state.pos);camera.rotation.order='ZYX';
 
 // central reset helper (works on phone & desktop)
 function resetState(){
   state.pos.set(900,380,900);
-  state.pitch=0; state.roll=0;
-  state.yaw=THREE.MathUtils.degToRad(-135);
-  state.speed=90; state.throttle=.6;
+  state.pitch = 0; state.roll = 0;
+  state.yaw = THREE.MathUtils.degToRad(-135);
+  state.speed = 51.5;     // 100 kt
+  state.throttle = 0.15;  // match the steady-speed throttle
 }
+
 
 const keys=new Set();
 window.addEventListener('keydown',e=>{
@@ -338,16 +346,24 @@ tick(last);
 
     tc.querySelectorAll('.btn[data-code]').forEach(btn => {
       const code = btn.getAttribute('data-code');
-      const start = (ev)=>{ ev.preventDefault(); keysDown.add(code); };
-      const end   = (ev)=>{ ev.preventDefault(); keysDown.delete(code); };
 
-      btn.addEventListener('touchstart', start, {passive:false});
-      btn.addEventListener('touchend', end, {passive:false});
-      btn.addEventListener('touchcancel', end, {passive:false});
-      btn.addEventListener('mousedown', start);
-      btn.addEventListener('mouseup', end);
-      btn.addEventListener('mouseleave', end);
+      const onDown = (ev) => {
+        ev.preventDefault();
+        keys.add(code);
+        try { btn.setPointerCapture(ev.pointerId); } catch(_) {}
+      };
+      const onUpLike = () => { keys.delete(code); };
+
+      btn.addEventListener('pointerdown', onDown);
+      btn.addEventListener('pointerup', onUpLike);
+      btn.addEventListener('pointercancel', onUpLike);
+      btn.addEventListener('lostpointercapture', onUpLike);
+
+      // Safety: if finger slides off the button or ends outside it:
+      window.addEventListener('pointerup', onUpLike);
+      window.addEventListener('pointercancel', onUpLike);
     });
+
 
     const pauseBtn = document.getElementById('tc-pause');
     const resetBtn = document.getElementById('tc-reset');
