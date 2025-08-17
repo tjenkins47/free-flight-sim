@@ -31,35 +31,45 @@ const suburbSprite = makeCircleSprite(64);
 
 
 function addStars(){
+  const isPhone = /Mobi|Android/i.test(navigator.userAgent);
+
+  // On phones: bring the star shell closer so perspective doesn’t obliterate them
+  const n    = isPhone ? 6000 : 5000;          // slight count bump on phone
+  const rMin = isPhone ? 4000  : 8000;         // was 8000
+  const rMax = isPhone ? 9000  : 16000;        // was 16000
+
   const g = new THREE.BufferGeometry();
-  const n = 5000;
-  const pos = new Float32Array(n*3);
-  for (let i=0;i<n;i++){
-    const r=8000+Math.random()*8000;
-    const th=Math.random()*Math.PI*2;
-    const ph=Math.random()*Math.PI*0.9;
-    const x=r*Math.sin(ph)*Math.cos(th);
-    const y=r*Math.cos(ph)+1500;
-    const z=r*Math.sin(ph)*Math.sin(th);
-    pos.set([x,y,z],i*3);
+  const pos = new Float32Array(n * 3);
+
+  for (let i = 0; i < n; i++) {
+    const r  = rMin + Math.random() * (rMax - rMin);
+    const th = Math.random() * Math.PI * 2;
+    const ph = Math.random() * Math.PI * 0.9;
+    const x  = r * Math.sin(ph) * Math.cos(th);
+    const y  = r * Math.cos(ph) + 1500;
+    const z  = r * Math.sin(ph) * Math.sin(th);
+    pos.set([x, y, z], i * 3);
   }
-  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
-    const isPhone = /Mobi|Android/i.test(navigator.userAgent);
-    const m = new THREE.PointsMaterial({
-      size: isPhone ? 12 : 6,        // ~2× phone size (was 4)
-      sizeAttenuation: true,         // keep the classic look
-      color: 0xdef3ff,               // brighter tint than 0x9fcfff
-      transparent: true,
-      opacity: isPhone ? 1.0 : 0.95, // ~2× brightness feel on phone
-      depthWrite: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending
-    });
-  const stars = new THREE.Points(g,m);
+  const m = new THREE.PointsMaterial({
+    // Phone: pixel-sized & bigger; Desktop: classic perspective attenuated
+    size: isPhone ? 10 * dpr : 4,              // try 12*dpr if you want even bolder
+    sizeAttenuation: !isPhone,                 // <-- KEY FIX (phones = false)
+    color: 0xdef3ff,                           // a touch brighter than before
+    transparent: true,
+    opacity: isPhone ? 1.0 : 0.95,             // brighter on phone
+    depthWrite: false,
+    toneMapped: false,
+    blending: THREE.AdditiveBlending
+  });
+
+  const stars = new THREE.Points(g, m);
   stars.name = 'stars';
   scene.add(stars);
 }
+
 addStars();
 
 const oceanGeo=new THREE.PlaneGeometry(30000,30000,200,200);
