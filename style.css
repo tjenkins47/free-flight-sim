@@ -13,7 +13,7 @@ html, body, #scene, #hud, #touchControls { border: none !important; outline: non
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 128px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 192px);
   display: none; /* enabled on touch devices & via media query */
   user-select: none;
   z-index: 20;
