@@ -1,5 +1,13 @@
-const canvas=document.getElementById('scene');
-if(canvas&&canvas.focus){window.addEventListener('load',()=>canvas.focus());canvas.addEventListener('click',()=>canvas.focus());}
+// ===== Canvas (single declaration) + keep focus on desktop =====
+const canvas = document.getElementById('scene');
+// orig good: if(canvas&&canvas.focus){window.addEventListener('load',()=>canvas.focus());canvas.addEventListener('click',()=>canvas.focus());}
+if (canvas) {
+  canvas.tabIndex = 0;            // make focusable for keyboard
+  canvas.style.outline = 'none';
+  window.addEventListener('load', () => canvas.focus());
+  canvas.addEventListener('pointerdown', () => canvas.focus());
+  canvas.addEventListener('click', () => canvas.focus());
+}
 
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true});renderer.setSize(window.innerWidth,window.innerHeight);renderer.setPixelRatio(Math.min(2,window.devicePixelRatio));renderer.shadowMap.enabled=true;renderer.setClearColor(0x04070f,1);
 const scene=new THREE.Scene();
@@ -28,7 +36,6 @@ function makeCircleSprite(size=64){
   return tex;
 }
 const suburbSprite = makeCircleSprite(64);
-
 
 function addStars(){
   // Remove any old stars so we don't keep the previous material/size
@@ -89,24 +96,23 @@ function addStars(){
 
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
 
-  // Quarter the previous feel on phone, and make them round via map+alphaMap
-  const phoneSizePx = 2.25 * dpr;     // tweak to 3.5–4*dpr if still too small
-  const desktopSize = 3;           // classic desktop size
+  const phoneSizePx = 2.25 * dpr;
+  const desktopSize = 3;
 
-    const m = new THREE.PointsMaterial({
-      size: isPhone ? phoneSizePx : desktopSize,
-      sizeAttenuation: false,       // <<< key: pixel-sized on BOTH phone & desktop
-      map: starTex,
-      alphaMap: starTex,
-      alphaTest: 0.2,               // softer cutoff to reduce sparkle
-      color: 0xE6F5FF,
-      transparent: true,
-      opacity: 0.95,                // still bright, but less bloom-bling
-      depthWrite: false,
-      depthTest: true,
-      toneMapped: false,
-      blending: THREE.NormalBlending // <<< normal blending = less “sparkle”
-    });
+  const m = new THREE.PointsMaterial({
+    size: isPhone ? phoneSizePx : desktopSize,
+    sizeAttenuation: false,       // pixel-sized on phone & desktop
+    map: starTex,
+    alphaMap: starTex,
+    alphaTest: 0.2,
+    color: 0xE6F5FF,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+    depthTest: true,
+    toneMapped: false,
+    blending: THREE.NormalBlending
+  });
 
   m.needsUpdate = true;
 
@@ -199,18 +205,17 @@ function createSuburbLights({
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
   const m = new THREE.PointsMaterial({
       size: sizePX * dpr,
-      sizeAttenuation: false,      // pixel-sized: great on phones
-      map: suburbSprite,           // << round sprite
-      alphaTest: 0.5,              // cut out square corners
+      sizeAttenuation: false,      // pixel-sized: great on phones/desktop
+      map: suburbSprite,           // round sprite
+      alphaTest: 0.5,
       vertexColors: true,
-      color: 0xffffff,             // multiply by vertex colors
+      color: 0xffffff,
       transparent: true,
       opacity: 1.0,
       depthWrite: false,
       toneMapped: false,
       blending: THREE.AdditiveBlending
     });
-
 
   const pts = new THREE.Points(g, m);
   pts.name = 'suburbLights';
@@ -263,7 +268,6 @@ createSuburbLights({
   paletteBias: 0.65
 });
 
-
 const state = {
   throttle: 0.15,   // was .6  ← balance around 100 kt at start
   speed: 51.5,      // 100 kt in m/s
@@ -284,15 +288,10 @@ function resetState(){
   state.throttle = 0.15;  // match the steady-speed throttle
 }
 
-
 const keys=new Set();
 window.addEventListener('keydown',e=>{
   keys.add(e.code);
-  if(e.code==='Numpad3'){
-    window.__paused=!window.__paused;
-    const p=document.getElementById('paused');
-    if(p) p.style.display=window.__paused?'block':'none';
-  }
+  // IMPORTANT: do not handle Numpad3 here; debounced handler below owns Pause.
   if (e.code==='NumpadDecimal') resetState(); // desktop reset
 });
 window.addEventListener('keyup',e=>keys.delete(e.code));
@@ -366,7 +365,7 @@ function tick(now){
 }
 tick(last);
 
-/* ===== Mobile controls + Pause integration ===== */
+/* ===== Mobile controls + Pause integration (debounced Pause owner) ===== */
 (function(){
   function setPaused(p){
     window.__paused = !!p;
@@ -380,13 +379,17 @@ tick(last);
   function togglePause(){
     const now = performance.now();
     if (!togglePause._t) togglePause._t = 0;
-    if (now - togglePause._t < 160) return;
+    if (now - togglePause._t < 160) return;   // debounce
     togglePause._t = now;
     setPaused(!window.__paused);
   }
 
+  // Debounced Pause handler (single owner). Accept Numpad3 OR top-row 3.
   window.addEventListener('keydown', (e)=>{
-    if (e.code === 'Numpad3') { e.preventDefault(); togglePause(); }
+    if (e.code === 'Numpad3' || e.code === 'Digit3' || e.key === '3') {
+      e.preventDefault();
+      togglePause();
+    }
   }, {passive:false});
 
   const tc = document.getElementById('touchControls');
@@ -413,11 +416,9 @@ tick(last);
       btn.addEventListener('pointercancel', onUpLike);
       btn.addEventListener('lostpointercapture', onUpLike);
 
-      // Safety: if finger slides off the button or ends outside it:
       window.addEventListener('pointerup', onUpLike);
       window.addEventListener('pointercancel', onUpLike);
     });
-
 
     const pauseBtn = document.getElementById('tc-pause');
     const resetBtn = document.getElementById('tc-reset');
@@ -427,12 +428,13 @@ tick(last);
       pauseBtn.addEventListener('touchend', onTap, {passive:false});
     }
     if (resetBtn) {
-      const onTap = (ev)=>{ ev.preventDefault(); resetState(); }; // direct reset (mobile-safe)
+      const onTap = (ev)=>{ ev.preventDefault(); resetState(); };
       resetBtn.addEventListener('click', onTap);
       resetBtn.addEventListener('touchend', onTap, {passive:false});
     }
   }
 
+  // Defensive pause patches (safe no-ops if already paused elsewhere)
   if (THREE && THREE.Clock && !THREE.Clock.__patched_for_pause__) {
     const _getDelta = THREE.Clock.prototype.getDelta;
     THREE.Clock.prototype.getDelta = function(){
@@ -453,20 +455,20 @@ tick(last);
   setPaused(!!window.__paused);
 })();
 
-/* ===== Suburb Lights Enhancer ===== */
+/* ===== Suburb Lights Enhancer (unchanged visuals) ===== */
 (function enhanceSuburbLights(){
   if (!scene || !THREE) return;
   scene.traverse(obj => {
     if (obj.isPoints && obj.name === 'suburbLights') {
       const m = obj.material;
-      m.sizeAttenuation = false;           // keep pixel-based for phones
+      m.sizeAttenuation = false;           // keep pixel-based for phones & desktop
       m.toneMapped = false;
       m.transparent = true;
       m.depthWrite = false;
-      m.opacity = 0.9;                     // adjust to taste
-      m.blending = THREE.AdditiveBlending; // nice glow pop
+      m.opacity = 0.9;
+      m.blending = THREE.AdditiveBlending;
       const dpr = (renderer.getPixelRatio ? renderer.getPixelRatio() : 1);
-      m.size = Math.max(m.size || 0, 9 * dpr); // ensure minimum size
+      m.size = Math.max(m.size || 0, 9 * dpr);
       m.needsUpdate = true;
     }
   });
