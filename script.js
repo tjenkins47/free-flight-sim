@@ -47,7 +47,7 @@ function addStars(){
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
     const isPhone = /Mobi|Android/i.test(navigator.userAgent);
     const m = new THREE.PointsMaterial({
-      size: isPhone ? 9 : 4.5,        // ~2× phone size (was 4)
+      size: isPhone ? 12 : 6,        // ~2× phone size (was 4)
       sizeAttenuation: true,         // keep the classic look
       color: 0xdef3ff,               // brighter tint than 0x9fcfff
       transparent: true,
