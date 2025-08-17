@@ -31,8 +31,13 @@ const suburbSprite = makeCircleSprite(64);
 
 
 function addStars(){
+  // Remove any old stars so we don't keep the previous material/size
+  const old = scene.getObjectByName('stars');
+  if (old) { scene.remove(old); old.geometry?.dispose?.(); old.material?.dispose?.(); }
+
   const isPhone = /Mobi|Android/i.test(navigator.userAgent);
 
+  // Bring the shell a bit closer on phone so perspective loss is reduced
   const n    = isPhone ? 6000 : 5000;
   const rMin = isPhone ? 4000  : 8000;
   const rMax = isPhone ? 9000  : 16000;
@@ -51,41 +56,62 @@ function addStars(){
   }
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
 
+  // ---- crisp circular sprite texture (important to avoid squares) ----
+  function makeCircleSprite(size=64){
+    const cnv = document.createElement('canvas');
+    cnv.width = cnv.height = size;
+    const ctx = cnv.getContext('2d');
+
+    // fully clear first
+    ctx.clearRect(0,0,size,size);
+
+    // soft round star with bright core
+    const r = size/2;
+    const grad = ctx.createRadialGradient(r, r, 0, r, r, r);
+    grad.addColorStop(0.0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+    grad.addColorStop(1.0, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(r, r, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    const tex = new THREE.CanvasTexture(cnv);
+    // Important: ensure smooth edges and correct alpha on mobile GPUs
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    tex.premultiplyAlpha = true;
+    tex.needsUpdate = true;
+    return tex;
+  }
+  const starTex = makeCircleSprite(64);
+
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
 
-  // quarter the size compared to last time
-  const baseSize = isPhone ? 3 * dpr : 4;  
-
-  // round star texture
-  const starCanvas = document.createElement('canvas');
-  starCanvas.width = starCanvas.height = 64;
-  const ctx = starCanvas.getContext('2d');
-  const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  gradient.addColorStop(0, 'rgba(255,255,255,1)');
-  gradient.addColorStop(0.4, 'rgba(255,255,255,0.8)');
-  gradient.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 64, 64);
-  const starTexture = new THREE.CanvasTexture(starCanvas);
+  // Quarter the previous feel on phone, and make them round via map+alphaMap
+  const phoneSizePx = 3 * dpr;     // tweak to 3.5–4*dpr if still too small
+  const desktopSize = 4;           // classic desktop size
 
   const m = new THREE.PointsMaterial({
-    size: baseSize,
-    sizeAttenuation: !isPhone, 
-    map: starTexture,         // <-- circular sprite
-    alphaTest: 0.1,           // discard transparent pixels
+    size: isPhone ? phoneSizePx : desktopSize,
+    sizeAttenuation: !isPhone,     // phone = pixel size; desktop = perspective
+    map: starTex,
+    alphaMap: starTex,             // force alpha to cut corners
+    alphaTest: 0.5,                // discard square edges
+    color: 0xE6F5FF,               // a touch brighter than #9fcfff
     transparent: true,
-    opacity: 0.95,
+    opacity: isPhone ? 1.0 : 0.95,
     depthWrite: false,
     toneMapped: false,
     blending: THREE.AdditiveBlending
   });
+  m.needsUpdate = true;
 
   const stars = new THREE.Points(g, m);
   stars.name = 'stars';
   scene.add(stars);
 }
-
-
 addStars();
 
 const oceanGeo=new THREE.PlaneGeometry(30000,30000,200,200);
