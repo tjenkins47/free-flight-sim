@@ -33,10 +33,9 @@ const suburbSprite = makeCircleSprite(64);
 function addStars(){
   const isPhone = /Mobi|Android/i.test(navigator.userAgent);
 
-  // On phones: bring the star shell closer so perspective doesn’t obliterate them
-  const n    = isPhone ? 6000 : 5000;          // slight count bump on phone
-  const rMin = isPhone ? 4000  : 8000;         // was 8000
-  const rMax = isPhone ? 9000  : 16000;        // was 16000
+  const n    = isPhone ? 6000 : 5000;
+  const rMin = isPhone ? 4000  : 8000;
+  const rMax = isPhone ? 9000  : 16000;
 
   const g = new THREE.BufferGeometry();
   const pos = new Float32Array(n * 3);
@@ -53,13 +52,29 @@ function addStars(){
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
 
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
+
+  // quarter the size compared to last time
+  const baseSize = isPhone ? 3 * dpr : 4;  
+
+  // round star texture
+  const starCanvas = document.createElement('canvas');
+  starCanvas.width = starCanvas.height = 64;
+  const ctx = starCanvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gradient.addColorStop(0, 'rgba(255,255,255,1)');
+  gradient.addColorStop(0.4, 'rgba(255,255,255,0.8)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 64, 64);
+  const starTexture = new THREE.CanvasTexture(starCanvas);
+
   const m = new THREE.PointsMaterial({
-    // Phone: pixel-sized & bigger; Desktop: classic perspective attenuated
-    size: isPhone ? 10 * dpr : 4,              // try 12*dpr if you want even bolder
-    sizeAttenuation: !isPhone,                 // <-- KEY FIX (phones = false)
-    color: 0xdef3ff,                           // a touch brighter than before
+    size: baseSize,
+    sizeAttenuation: !isPhone, 
+    map: starTexture,         // <-- circular sprite
+    alphaTest: 0.1,           // discard transparent pixels
     transparent: true,
-    opacity: isPhone ? 1.0 : 0.95,             // brighter on phone
+    opacity: 0.95,
     depthWrite: false,
     toneMapped: false,
     blending: THREE.AdditiveBlending
@@ -69,6 +84,7 @@ function addStars(){
   stars.name = 'stars';
   scene.add(stars);
 }
+
 
 addStars();
 
