@@ -40,7 +40,103 @@ function animateOcean(t){const pos=ocean.geometry.attributes.position;for(let i=
 const land=new THREE.Mesh(new THREE.PlaneGeometry(30000,30000,32,32),new THREE.MeshStandardMaterial({color:0x0b0f14,roughness:1}));land.rotation.x=-Math.PI/2;land.position.set(-12000,0,0);land.receiveShadow=true;scene.add(land);
 function createRunway(){const L=2200,W=70;const base=new THREE.Mesh(new THREE.BoxGeometry(L,2,W),new THREE.MeshStandardMaterial({color:0x202426,roughness:.7,metalness:.1,emissive:0x0f0f0f,emissiveIntensity:1.2}));base.castShadow=true;base.receiveShadow=true;base.position.set(-60,1.5,-400);scene.add(base);
 const clMat=new THREE.MeshBasicMaterial({color:0xcdf3ff});for(let i=-L/2+40;i<=L/2-40;i+=70){const b=new THREE.Mesh(new THREE.SphereGeometry(2.2,10,10),clMat);b.position.set(base.position.x+i,2.6,base.position.z);scene.add(b);}for(let dz=-W/2+6;dz<=W/2-6;dz+=6){const g=new THREE.Mesh(new THREE.SphereGeometry(2.8,12,12),new THREE.MeshBasicMaterial({color:0x00ff88}));g.position.set(base.position.x-L/2+5,2.8,base.position.z+dz);scene.add(g);const r=new THREE.Mesh(new THREE.SphereGeometry(2.8,12,12),new THREE.MeshBasicMaterial({color:0xff5577}));r.position.set(base.position.x+L/2-5,2.8,base.position.z+dz);scene.add(r);}const coastGlow=new THREE.PointLight(0x66aaff,2.2,5000,2);coastGlow.position.set(base.position.x,60,base.position.z-100);scene.add(coastGlow);}createRunway();
-function createCityNW(){const group=new THREE.Group();const rows=16,cols=16,spacing=55;const baseX=-1200,baseZ=-1200;for(let r=0;r<rows;r++){for(let c=0;c<cols;c++){const h=60+Math.pow(Math.random(),2)*420;const b=new THREE.Mesh(new THREE.BoxGeometry(45,h,45),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.9,metalness:.05,emissive:0x1a1f2e,emissiveIntensity:1.1}));b.position.set(baseX-c*spacing,h/2,baseZ-r*spacing);b.castShadow=true;b.receiveShadow=true;group.add(b);const w1=new THREE.Mesh(new THREE.BoxGeometry(41,h*.92,1),new THREE.MeshBasicMaterial({color:0xffffff}));w1.position.set(b.position.x,b.position.y,b.position.z+24);group.add(w1);const w2=w1.clone();w2.position.set(b.position.x+24,b.position.y,b.position.z);w2.rotation.y=Math.PI/2;group.add(w2);}}const glow=new THREE.PointLight(0xffe8a3,2.0,8000,1.6);glow.position.set(baseX-(cols*spacing)/2,250,baseZ-(rows*spacing)/2);group.add(glow);scene.add(group);}createCityNW();
+
+// --- Suburb lights ribbon(s) along coastline (land side = x < coastX) ---
+function createSuburbLights({
+  coastX = 0,          // shoreline X (with your setup: land at x≈-12000, ocean at x≈+12000 -> coast near 0)
+  length = 24000,      // span along Z
+  depth = 3000,        // how far inland the lights extend (negative X)
+  density = 0.00005,   // points per m^2 (start small, increase for denser lights)
+  sizePX = 8,          // pixel size (scaled by DPR below)
+  paletteBias = 0.65   // 0..1 (higher = warmer overall)
+}) {
+  const zMin = -length/2, zMax = length/2;
+  const xMin = coastX - depth, xMax = coastX;   // land side only (x < coastX)
+
+  const area = (xMax - xMin) * (zMax - zMin);
+  const count = Math.max(1, Math.floor(area * density));
+
+  const pos = new Float32Array(count * 3);
+  const col = new Float32Array(count * 3);
+
+  const pickColor = () => {
+    const r = Math.random();
+    const warmCut = paletteBias * 0.6; // bias toward warm suburban sodium/LED mix
+    if (r < warmCut)        return new THREE.Color(0xfff1b3); // warm amber
+    if (r < warmCut + 0.20) return new THREE.Color(0xfff6e5); // soft white
+    if (r < warmCut + 0.35) return new THREE.Color(0xaed4ff); // cool white-blue
+    if (r < warmCut + 0.42) return new THREE.Color(0xff7a7a); // occasional neon red
+    if (r < warmCut + 0.49) return new THREE.Color(0x9bff9b); // occasional neon green
+    return new THREE.Color(0xffefcf);
+  };
+
+  let i = 0;
+  while (i < count) {
+    // uniform sample, then bias acceptance toward the shoreline so lights are denser near the coast
+    const x = xMin + Math.random() * (xMax - xMin);
+    const z = zMin + Math.random() * (zMax - zMin);
+    const distFromShore = (coastX - x) / depth;           // 0 at shore -> 1 at inland edge
+    const accept = 0.25 + 0.75 * (1 - distFromShore);     // denser near coast
+    if (Math.random() > accept) continue;
+
+    // tiny jitter and a little height above ground for glow
+    const y = 8 + Math.random() * 40;
+
+    const c = pickColor();
+    pos[i*3+0] = x + (Math.random()*20 - 10);
+    pos[i*3+1] = y;
+    pos[i*3+2] = z + (Math.random()*20 - 10);
+
+    col[i*3+0] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
+    i++;
+  }
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+
+  // Phone-friendly: size in pixels, scaled by DPR so they stay bold on mobile
+  const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
+  const m = new THREE.PointsMaterial({
+    size: sizePX * dpr,
+    sizeAttenuation: false, // critical so points don't shrink with distance on phones
+    vertexColors: true,
+    transparent: true,
+    opacity: 1.0,
+    depthWrite: false,
+    toneMapped: false
+  });
+
+  const pts = new THREE.Points(g, m);
+  pts.name = 'suburbLights';
+  scene.add(pts);
+  return pts;
+}
+
+function createCityNW(){const group=new THREE.Group();const rows=16,cols=16,spacing=55;const baseX=-1200,baseZ=-1200;for(let r=0;r<rows;r++){for(let c=0;c<cols;c++){const h=60+Math.pow(Math.random(),2)*420;const b=new THREE.Mesh(new THREE.BoxGeometry(45,h,45),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.9,metalness:.05,emissive:0x1a1f2e,emissiveIntensity:1.1}));b.position.set(baseX-c*spacing,h/2,baseZ-r*spacing);b.castShadow=true;b.receiveShadow=true;group.add(b);const w1=new THREE.Mesh(new THREE.BoxGeometry(41,h*.92,1),new THREE.MeshBasicMaterial({color:0xffffff}));w1.position.set(b.position.x,b.position.y,b.position.z+24);group.add(w1);const w2=w1.clone();w2.position.set(b.position.x+24,b.position.y,b.position.z);w2.rotation.y=Math.PI/2;group.add(w2);}}const glow=new THREE.PointLight(0xffe8a3,2.0,8000,1.6);glow.position.set(baseX-(cols*spacing)/2,250,baseZ-(rows*spacing)/2);group.add(glow);scene.add(group);}
+createCityNW();
+
+// near-shore ribbon
+createSuburbLights({
+  coastX: 0,
+  length: 24000,
+  depth: 2200,
+  density: 0.00012,
+  sizePX: 10,        // was 8
+  paletteBias: 0.72
+});
+
+// inland ribbon
+createSuburbLights({
+  coastX: 0,
+  length: 24000,
+  depth: 5200,
+  density: 0.00005,  // was 0.00003
+  sizePX: 9,         // was 7
+  paletteBias: 0.65
+});
+
+
 const state={throttle:.6,speed:90,pos:new THREE.Vector3(900,380,900),pitch:0,yaw:THREE.MathUtils.degToRad(-135),roll:0};
 camera.position.copy(state.pos);camera.rotation.order='ZYX';
 const keys=new Set();
@@ -53,8 +149,7 @@ function physics(dt){
 if(thrUp)state.throttle+=.25*dt;if(thrDn)state.throttle-=.25*dt;state.throttle=clamp(state.throttle,0,1);const rate=.5*(.6+state.speed/140);if(pitchUp)state.pitch+=rate*dt;if(pitchDn)state.pitch-=rate*dt;state.pitch=clamp(state.pitch,THREE.MathUtils.degToRad(-60),THREE.MathUtils.degToRad(60));if(rollL)state.roll+=rate*dt;if(rollR)state.roll-=rate*dt;state.roll=clamp(state.roll,THREE.MathUtils.degToRad(-100),THREE.MathUtils.degToRad(100));if(yawL)state.yaw+=rate*.5*dt;if(yawR)state.yaw-=rate*.5*dt;
 const forward=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(state.pitch,state.yaw,0,'YXZ')).normalize();const drag = 0.012 + 0.0015*(state.speed/100)**2;const thrust=220*state.throttle;const liftCoeff=.75;const gravity=9.81;let accel=thrust-drag*state.speed*state.speed;if(brake)accel-=80;state.speed+=accel*dt*.2;state.speed=clamp(state.speed,0,260);const climb=forward.y*state.speed;const lift=liftCoeff*state.speed*.02*Math.cos(state.pitch);let vy=climb+lift-gravity;if(state.pos.y<=2&&vy<0){vy=0;state.pos.y=2;state.speed*=.985;}state.pos.addScaledVector(forward,state.speed*dt);state.pos.y+=vy*dt;const e=new THREE.Euler(state.pitch,state.yaw,state.roll,'ZYX');camera.setRotationFromEuler(e);camera.position.copy(state.pos);}
 const hud={throttle:document.getElementById('throttle'),speed:document.getElementById('speed'),altitude:document.getElementById('altitude'),pitch:document.getElementById('pitch'),roll:document.getElementById('roll'),yaw:document.getElementById('yaw')};
-const knots = state.speed * 1.94384;
-function updateHUD(){hud.throttle.textContent=Math.round(state.throttle*100)+'%';hud.speed.textContent=Math.round(knots);hud.altitude.textContent=Math.round(state.pos.y);hud.pitch.textContent=Math.round(THREE.MathUtils.radToDeg(state.pitch));hud.roll.textContent=Math.round(THREE.MathUtils.radToDeg(state.roll));hud.yaw.textContent=Math.round((THREE.MathUtils.radToDeg(state.yaw)+360)%360);}
+function updateHUD(){hud.throttle.textContent=Math.round(state.throttle*100)+'%';const knots = state.speed * 1.94384;hud.speed.textContent=Math.round(knots);hud.altitude.textContent=Math.round(state.pos.y);hud.pitch.textContent=Math.round(THREE.MathUtils.radToDeg(state.pitch));hud.roll.textContent=Math.round(THREE.MathUtils.radToDeg(state.roll));hud.yaw.textContent=Math.round((THREE.MathUtils.radToDeg(state.yaw)+360)%360);}
 window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
 let last=performance.now();function tick(now){const dt=Math.min(.05,(now-last)/1000);last=now;physics(dt);animateOcean(now*.06);renderer.render(scene,camera);updateHUD();requestAnimationFrame(tick);}tick(last);
 
@@ -149,44 +244,26 @@ let last=performance.now();function tick(now){const dt=Math.min(.05,(now-last)/1
   setPaused(!!window.__paused);
 })();
 
-
-
-
-/* ===== Global City Lights Enhancement (v6) ===== */
-(function enhanceAllCityLights(){
-  if (!scene) return;
+/* ===== Suburb Lights Enhancer ===== */
+(function enhanceSuburbLights(){
+  if (!scene || !THREE) return;
   scene.traverse(obj => {
-    if (obj.isPoints && obj.material && obj.material.isPointsMaterial && obj.name !== 'stars'){
-      if ('size' in obj.material) {
-        obj.material.size = (obj.material.size || 2.5) * (5.0 + Math.random() * 1.5);
-// ↑ try 3.2–4.1x; push higher if you want bolder lights
-      }
-      obj.material.sizeAttenuation = true;
-      obj.material.transparent = true;
-      obj.material.opacity = 1.0;
-      obj.material.vertexColors = true;
-      obj.material.toneMapped = false;
-      obj.material.needsUpdate = true;
-      const g = obj.geometry;
-      if (g && g.getAttribute('position') && !g.getAttribute('color')) {
-        const count = g.getAttribute('position').count;
-        const colors = new Float32Array(count*3);
-        for (let i=0;i<count;i++){
-          let col = new THREE.Color();
-          const r = Math.random();
-          if (r<0.25) col.set(0xfff1b3);
-          else if (r<0.5) col.set(0xffe9cf);
-          else if (r<0.7) col.set(0xaed4ff);
-          else if (r<0.85) col.set(0xff7a7a);
-          else col.set(0x9bff9b);
-          colors[i*3+0]=col.r;colors[i*3+1]=col.g;colors[i*3+2]=col.b;
-        }
-        g.setAttribute('color', new THREE.BufferAttribute(colors,3));
-      }
+    if (obj.isPoints && obj.name === 'suburbLights') {
+      const m = obj.material;
+      // keep them bold on phones
+      m.sizeAttenuation = false;               // pixel-based sizing
+      m.toneMapped = false;
+      m.transparent = true;
+      m.depthWrite = false;
+      m.opacity = 0.9;                         // 0.85–1.0 to taste
+      m.blending = THREE.AdditiveBlending;     // subtle glow “pop”
+      // ensure a minimum pixel size (covers both bands you created)
+      const dpr = (renderer.getPixelRatio ? renderer.getPixelRatio() : 1);
+      m.size = Math.max(m.size || 0, 9 * dpr); // raise to 10*dpr for bolder
+      m.needsUpdate = true;
     }
-    if (obj.isMesh && obj.material && obj.material.isMeshBasicMaterial) {
-      obj.material.color.set(0xffffff);
-    }
-
   });
 })();
+
+
+
