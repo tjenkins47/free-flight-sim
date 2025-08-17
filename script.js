@@ -15,6 +15,54 @@ const camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight
 const ambient=new THREE.AmbientLight(0x6b86c2,.55);scene.add(ambient);
 const moon=new THREE.DirectionalLight(0xaaccff,.7);moon.position.set(-1500,2500,-1800);moon.castShadow=true;scene.add(moon);
 
+/* ===== Real-world mapping anchored ~2 miles SW of Boston Logan ===== */
+const GEO = {
+  logan: { lat: 42.3656, lon: -71.0096 },   // approximate KBOS
+  MI_TO_M: 1609.344,
+  metersPerDegLat: 111_320                  // good local approximation
+};
+
+// 2 miles SW from Logan: SW = 225° → equal south & west components
+const _d = 2 * GEO.MI_TO_M;                 // ~3218.688 m
+const _dNS = -_d / Math.SQRT2;              // south (negative north)
+const _dEW = -_d / Math.SQRT2;              // west  (negative east)
+
+// Convert small meter offsets to lat/lon deltas around a reference latitude
+function addMetersToLatLon(latDeg, lonDeg, dNorth, dEast){
+  const mPerLat = GEO.metersPerDegLat;
+  const mPerLon = GEO.metersPerDegLat * Math.cos(latDeg * Math.PI/180);
+  return { lat: latDeg + dNorth/mPerLat, lon: lonDeg + dEast/mPerLon };
+}
+
+// These are set after we know your initial spawn in local meters
+let ORIGIN_LL = null;      // { lat, lon }
+let ORIGIN_LOCAL = null;   // { x, z }
+
+// Convert scene (x,z) meters → {lat, lon}
+// Convention used here: +X = East,  -Z = North (your sim’s forward is −Z)
+function latLonFromLocalXZ(x, z){
+  const north = -(z - ORIGIN_LOCAL.z);
+  const east  =  (x - ORIGIN_LOCAL.x);
+  const mPerLat = GEO.metersPerDegLat;
+  const mPerLon = GEO.metersPerDegLat * Math.cos(ORIGIN_LL.lat * Math.PI/180);
+  return {
+    lat: ORIGIN_LL.lat + (north / mPerLat),
+    lon: ORIGIN_LL.lon + (east  / mPerLon)
+  };
+}
+
+// Heading: 0° = North, 90° = East (project forward onto ground)
+function headingDegFromState(state){
+  const fwd = new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(state.pitch, state.yaw, 0, 'YXZ'));
+  return (Math.atan2(fwd.x, -fwd.z) * 180/Math.PI + 360) % 360;
+}
+function headingText(deg){
+  const pts = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  return pts[Math.round(deg / 22.5) % 16];
+}
+
+
+
 // Make a soft circular sprite texture for round points
 function makeCircleSprite(size=64){
   const cnv = document.createElement('canvas');
@@ -278,6 +326,9 @@ const state = {
 };
 
 camera.position.copy(state.pos);camera.rotation.order='ZYX';
+// Real-world origin = ~2 miles SW of Logan, anchored to current local spawn
+ORIGIN_LL    = addMetersToLatLon(GEO.logan.lat, GEO.logan.lon, _dNS, _dEW);
+ORIGIN_LOCAL = { x: state.pos.x, z: state.pos.z };
 
 // central reset helper (works on phone & desktop)
 function resetState(){
@@ -351,7 +402,22 @@ function updateHUD(){
   hud.pitch.textContent=Math.round(THREE.MathUtils.radToDeg(state.pitch));
   hud.roll.textContent=Math.round(THREE.MathUtils.radToDeg(state.roll));
   hud.yaw.textContent=Math.round((THREE.MathUtils.radToDeg(state.yaw)+360)%360);
+  // --- NEW: Lat / Lon / Heading (only if elements exist in HTML) ---
+  if (ORIGIN_LL && ORIGIN_LOCAL) {
+    const ll = latLonFromLocalXZ(state.pos.x, state.pos.z);
+    const hdgDeg = headingDegFromState(state);
+    const hdgTxt = headingText(hdgDeg);
+
+    const latEl = document.getElementById('lat');
+    const lonEl = document.getElementById('lon');
+    const hdgEl = document.getElementById('heading');
+
+    if (latEl) latEl.textContent = `LAT ${ll.lat.toFixed(5)}`;
+    if (lonEl) lonEl.textContent = `LON ${ll.lon.toFixed(5)}`;
+    if (hdgEl) hdgEl.textContent = `HDG ${hdgDeg.toFixed(0)}° ${hdgTxt}`;
+  }
 }
+
 
 window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
 let last=performance.now();
