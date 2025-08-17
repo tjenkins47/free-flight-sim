@@ -90,22 +90,24 @@ function addStars(){
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
 
   // Quarter the previous feel on phone, and make them round via map+alphaMap
-  const phoneSizePx = 3 * dpr;     // tweak to 3.5–4*dpr if still too small
-  const desktopSize = 4;           // classic desktop size
+  const phoneSizePx = 2.25 * dpr;     // tweak to 3.5–4*dpr if still too small
+  const desktopSize = 3;           // classic desktop size
 
-  const m = new THREE.PointsMaterial({
-    size: isPhone ? phoneSizePx : desktopSize,
-    sizeAttenuation: !isPhone,     // phone = pixel size; desktop = perspective
-    map: starTex,
-    alphaMap: starTex,             // force alpha to cut corners
-    alphaTest: 0.5,                // discard square edges
-    color: 0xE6F5FF,               // a touch brighter than #9fcfff
-    transparent: true,
-    opacity: isPhone ? 1.0 : 0.95,
-    depthWrite: false,
-    toneMapped: false,
-    blending: THREE.AdditiveBlending
-  });
+    const m = new THREE.PointsMaterial({
+      size: isPhone ? phoneSizePx : desktopSize,
+      sizeAttenuation: false,       // <<< key: pixel-sized on BOTH phone & desktop
+      map: starTex,
+      alphaMap: starTex,
+      alphaTest: 0.2,               // softer cutoff to reduce sparkle
+      color: 0xE6F5FF,
+      transparent: true,
+      opacity: 0.95,                // still bright, but less bloom-bling
+      depthWrite: false,
+      depthTest: true,
+      toneMapped: false,
+      blending: THREE.NormalBlending // <<< normal blending = less “sparkle”
+    });
+
   m.needsUpdate = true;
 
   const stars = new THREE.Points(g, m);
