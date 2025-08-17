@@ -45,15 +45,17 @@ function addStars(){
   }
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));
   const dpr = Math.max(1, Math.min(3, renderer.getPixelRatio ? renderer.getPixelRatio() : 1));
+    const isPhone = /Mobi|Android/i.test(navigator.userAgent);
+
     const m = new THREE.PointsMaterial({
-      size: 4,                  // a touch bigger than 3
-      sizeAttenuation: true,    // perspective scaling like your classic version
-      color: 0xbfdfff,          // slightly brighter tint
+      size: isPhone ? 6 : 4,            // bump up star size on phone
+      sizeAttenuation: true,
+      color: 0xd5ecff,                  // brighter tint
       transparent: true,
-      opacity: 1.0,             // brighter
+      opacity: isPhone ? 1.0 : 0.95,    // stronger presence on phone
       depthWrite: false,
       toneMapped: false,
-      blending: THREE.AdditiveBlending  // subtle extra sparkle; remove if too bright
+      blending: THREE.AdditiveBlending
     });
 
   const stars = new THREE.Points(g,m);
@@ -210,7 +212,7 @@ createSuburbLights({
 });
 
 
-const state={throttle:.6,speed:90,pos:new THREE.Vector3(900,380,900),pitch:0,yaw:THREE.MathUtils.degToRad(-135),roll:0};
+const state={throttle:.6,speed:51.5,pos:new THREE.Vector3(900,380,900),pitch:0,yaw:THREE.MathUtils.degToRad(-135),roll:0};
 camera.position.copy(state.pos);camera.rotation.order='ZYX';
 
 // central reset helper (works on phone & desktop)
